@@ -6,7 +6,7 @@ from openai import OpenAI
 from ddgs import DDGS
 
 # ---------- 配置 ----------
-#DEEPSEEK_KEY = "YourApiKey"  # 请替换为真实密钥
+DEEPSEEK_KEY = "YourApiKey"  # 请替换为真实密钥
 
 client = OpenAI(
     api_key=DEEPSEEK_KEY,
