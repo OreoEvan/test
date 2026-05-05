@@ -5,8 +5,12 @@ import streamlit as st
 from openai import OpenAI
 from ddgs import DDGS
 
-# ---------- 配置 ----------
-#DEEPSEEK_KEY = "YourApiKey"  # 请替换为真实密钥
+# 尝试从 Streamlit Secrets 读取 API Key
+try:
+    DEEPSEEK_KEY = st.secrets["DEEPSEEK_KEY"]
+except Exception:
+    st.error("❌ 未找到 DeepSeek API Key，请在 Streamlit Cloud 的 Secrets 中配置 DEEPSEEK_KEY")
+    st.stop()
 
 client = OpenAI(
     api_key=DEEPSEEK_KEY,
