@@ -7,7 +7,7 @@ from openai import OpenAI
 from ddgs import DDGS
 PREF_FILE = "user_prefs.json"
 
-<<<<<<< HEAD
+<<<<<<< HEAD>>>>>>>
 # 尝试从 Streamlit Secrets 读取 API Key
 try:
     DEEPSEEK_KEY = st.secrets["DEEPSEEK_KEY"]
