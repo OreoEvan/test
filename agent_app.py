@@ -1,16 +1,23 @@
+import os
 import json
 import datetime
 import requests
 import streamlit as st
 from openai import OpenAI
 from ddgs import DDGS
+PREF_FILE = "user_prefs.json"
 
+<<<<<<< HEAD
 # 尝试从 Streamlit Secrets 读取 API Key
 try:
     DEEPSEEK_KEY = st.secrets["DEEPSEEK_KEY"]
 except Exception:
     st.error("❌ 未找到 DeepSeek API Key，请在 Streamlit Cloud 的 Secrets 中配置 DEEPSEEK_KEY")
     st.stop()
+=======
+# ---------- 配置 ----------
+DEEPSEEK_KEY = "YourApiKey"  # 请替换为真实密钥
+>>>>>>> fc61dcbb8fa72b9f294ba98a1a8ea9e1c7061096
 
 client = OpenAI(
     api_key=DEEPSEEK_KEY,
@@ -78,18 +85,84 @@ def web_search(query: str):
     except Exception as e:
         return f"搜索失败: {e}"
 
+def load_prefs():
+    if os.path.exists(PREF_FILE):
+        with open(PREF_FILE, "r") as f:
+            return json.load(f)
+    return {"style": "简洁", "city": "北京"}
+
+def save_prefs(prefs):
+    with open(PREF_FILE, "w") as f:
+        json.dump(prefs, f, indent=2)
+
+st.sidebar.title("⚙️ 偏好设置")
+prefs = load_prefs()
+new_style = st.sidebar.selectbox("回答风格", ["简洁", "详细", "带例子"], index=["简洁","详细","带例子"].index(prefs["style"]))
+new_city = st.sidebar.text_input("默认城市", prefs["city"])
+if st.sidebar.button("保存偏好"):
+    save_prefs({"style": new_style, "city": new_city})
+    st.sidebar.success("已保存")
+    prefs = load_prefs()  # 重新加载
+
 # ---------- 核心对话函数 ----------
-def get_ai_response(messages):
-    """输入消息列表（每个元素是字典，包含 role, content 等），返回助手的回答字符串，并更新 messages 列表"""
+def get_ai_response(messages, prefs):
+    # 根据偏好构建系统提示
+    system_prompt = f"你是一个助手。请用{prefs['style']}的风格回答。用户所在城市是{prefs['city']}，如果问天气可参考。"
+    
+    # 过滤掉原有的 system 消息（避免冲突），再加上我们的新 system
+    filtered_messages = [m for m in messages if m.get("role") != "system"]
+    messages_with_system = [{"role": "system", "content": system_prompt}] + filtered_messages
+
+    # 第一次调用（可能触发工具）
     response = client.chat.completions.create(
         model="deepseek-chat",
-        messages=messages,
+        messages=messages_with_system,
         tools=tools,
         tool_choice="auto"
     )
     msg = response.choices[0].message
 
-    # 将 assistant 的响应（可能含 tool_calls）转为字典存入历史
+    # 将 assistant 回复存入原始 messages（不存临时的 system）
+    assistant_dict = {"role": msg.role, "content": msg.content}
+    if msg.tool_calls:
+        assistant_dict["tool_calls"] = msg.tool_calls
+    messages.append(assistant_dict)
+
+    # 如果有工具调用
+    if msg.tool_calls:
+        for tool_call in msg.tool_calls:
+            func_name = tool_call.function.name
+            args = json.loads(tool_call.function.arguments)
+            if func_name == "get_current_time":
+                result = get_current_time()
+            elif func_name == "calculate":
+                expr = args.get("expression")
+                result = calculate(expr)
+            elif func_name == "web_search":
+                query = args.get("query")
+                result = web_search(query)
+            else:
+                result = "未知工具"
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": result
+            })
+
+        # 第二次调用，生成最终回答
+        response2 = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=messages
+        )
+        final_msg = response2.choices[0].message
+        final_dict = {"role": final_msg.role, "content": final_msg.content}
+        messages.append(final_dict)
+        return final_msg.content
+    else:
+        return msg.content
+   
+ # 将 assistant 的响应（可能含 tool_calls）转为字典存入历史
     assistant_dict = {"role": msg.role, "content": msg.content}
     if msg.tool_calls:
         assistant_dict["tool_calls"] = msg.tool_calls
@@ -136,9 +209,7 @@ st.markdown("支持查时间、计算、联网搜索。")
 
 # 初始化聊天历史（仅存字典）
 if "chat_history" not in st.session_state:
-    st.session_state.chat_history = [
-        {"role": "system", "content": "你是一个能调用工具的个人助手，可以获取时间、计算、搜索网络。请友好回应。"}
-    ]
+    st.session_state.chat_history = []
 
 # 显示历史消息（排除 system）
 for msg in st.session_state.chat_history:
@@ -160,6 +231,6 @@ if user_input:
     # 获取助手回复
     with st.chat_message("assistant"):
         with st.spinner("思考中..."):
-            reply = get_ai_response(st.session_state.chat_history)
+            reply = get_ai_response(st.session_state.chat_history, prefs)
             st.write(reply)
     # 助手回复已经由 get_ai_response 添加到 chat_history 中，无需重复添加
