@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # 避免默认GITHUB_TOKEN权限问题
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -32,5 +34,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add reports/
-          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-generated research report"
+          git diff --staged --quiet || git commit -m "Auto-generated research report"
           git push
